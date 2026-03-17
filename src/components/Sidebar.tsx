@@ -88,14 +88,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
           gap: 24px;
           flex: 1;
           overflow-y: auto;
-          overflow-x: visible;
+          overflow-x: hidden;
           width: 100%;
           padding: 0 10px;
-          scrollbar-width: none; /* Hide for Firefox */
+          scrollbar-gutter: stable;
         }
 
         .sidebar-items::-webkit-scrollbar {
-          display: none; /* Hide for Chrome/Safari */
+          width: 4px;
         }
 
         .sidebar-items::-webkit-scrollbar-track {
@@ -103,8 +103,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
         }
 
         .sidebar-items::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.05);
           border-radius: 10px;
+        }
+
+        .sidebar-items:hover::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
         }
 
         .sidebar-item {
