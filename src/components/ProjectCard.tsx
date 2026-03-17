@@ -1,13 +1,7 @@
 import React from 'react';
 import { Play, Settings, Command, Globe, FolderCode, Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 
-// Helper for tailwind class merging
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 export interface SubProject {
   id: string;

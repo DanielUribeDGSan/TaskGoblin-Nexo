@@ -15,7 +15,8 @@ interface NewEnvModalProps {
     keyPlaceholder: string;
     valuePlaceholder: string;
     addRow: string;
-    addSnippetBtn: string; // fallback if missing
+    saveProfile: string;
+    updateProfile: string;
   };
 }
 
