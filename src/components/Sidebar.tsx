@@ -1,5 +1,6 @@
-import React from 'react';
-import { Folder, Activity, Settings, Plus, Share2, Globe, Code, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import { Folder, Activity, Settings, Plus, Share2, Globe, Code, FileText, Menu, ChevronLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -24,6 +25,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject, translations }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const tabs = [
     { id: 'projects', icon: Folder, label: translations.projects },
     { id: 'ports', icon: Activity, label: translations.ports },
@@ -35,7 +38,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
   ];
 
   return (
-    <div className="sidebar">
+    <motion.div 
+      className={cn("sidebar", isExpanded && "expanded")}
+      animate={{ width: isExpanded ? 220 : 80 }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+    >
+      <button 
+        className="toggle-sidebar-btn" 
+        onClick={() => setIsExpanded(!isExpanded)}
+        title={isExpanded ? "Collapse" : "Expand"}
+      >
+        {isExpanded ? <ChevronLeft size={20} /> : <Menu size={20} />}
+      </button>
+
       <div className="sidebar-items">
         {tabs.map((tab) => (
           <button
@@ -43,12 +58,22 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
             onClick={() => setActiveTab(tab.id)}
             className={cn(
               'sidebar-item',
-              activeTab === tab.id && 'active'
+              activeTab === tab.id && 'active',
+              isExpanded && 'item-expanded'
             )}
           >
-            <tab.icon size={24} />
-            <span className="sidebar-label">{tab.label}</span>
-            <div className="custom-tooltip">{tab.label}</div>
+            <div className="item-icon-wrapper">
+              <tab.icon size={22} />
+            </div>
+            {isExpanded && (
+              <motion.span 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="sidebar-label"
+              >
+                {tab.label}
+              </motion.span>
+            )}
           </button>
         ))}
       </div>
@@ -59,39 +84,65 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
 
       <style dangerouslySetInnerHTML={{ __html: `
         .sidebar {
-          width: 100px;
+          width: 80px;
           height: 100%;
           background: var(--sidebar-bg);
           border-right: 1px solid var(--glass-border);
           display: flex;
           flex-direction: column;
           align-items: center;
-          padding: 40px 0;
+          padding: 20px 0 40px 0;
           position: relative;
+          z-index: 50;
+          flex-shrink: 0;
         }
 
-        .hostname-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
+        .sidebar.expanded {
+          align-items: flex-start;
+          padding-left: 16px;
+          padding-right: 16px;
         }
 
-        @media (max-width: 950px) {
-          .hostname-grid {
-            grid-template-columns: 1fr;
-          }
+        .toggle-sidebar-btn {
+          width: 100%;
+          height: 48px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-secondary);
+          background: none;
+          border: none;
+          cursor: pointer;
+          margin-bottom: 12px;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+
+        .expanded .toggle-sidebar-btn {
+          justify-content: flex-start;
+          padding: 0 16px;
+          margin-left: 0;
+        }
+
+        .toggle-sidebar-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: var(--text-primary);
+          border-color: var(--glass-border-bright);
         }
 
         .sidebar-items {
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          gap: 12px;
           flex: 1;
           overflow-y: auto;
           overflow-x: hidden;
           width: 100%;
-          padding: 0 10px;
-          scrollbar-gutter: stable;
+          padding: 0;
+        }
+
+        .expanded .sidebar-items {
+          padding: 0;
         }
 
         .sidebar-items::-webkit-scrollbar {
@@ -116,15 +167,31 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
           border: none;
           color: var(--text-secondary);
           display: flex;
-          flex-direction: column;
           align-items: center;
-          gap: 8px;
+          justify-content: center;
+          gap: 12px;
           cursor: pointer;
-          transition: all 0.3s ease;
+          transition: all 0.2s ease;
           position: relative;
-          padding: 12px 8px;
-          border-radius: 16px;
+          padding: 12px;
+          border-radius: 14px;
           width: 100%;
+        }
+
+        .item-icon-wrapper {
+          width: 100%;
+          display: flex;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .sidebar-item.item-expanded {
+          justify-content: flex-start;
+          padding: 12px 16px;
+        }
+
+        .sidebar-item.item-expanded .item-icon-wrapper {
+          width: auto;
         }
 
         .sidebar-item:hover {
@@ -135,70 +202,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
         .sidebar-item.active {
           color: var(--text-primary);
           background: rgba(255, 255, 255, 0.1);
+          box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.02);
         }
 
         .sidebar-item.active::after {
           content: '';
           position: absolute;
           left: 0;
-          top: 25%;
-          height: 50%;
-          width: 4px;
+          top: 20%;
+          height: 60%;
+          width: 3px;
           background: var(--status-online);
           border-radius: 0 4px 4px 0;
-          box-shadow: 0 0 10px var(--status-online);
-        }
-
-        .sidebar-item:hover .custom-tooltip {
-          visibility: visible;
-          opacity: 1;
-          transform: translateX(-50%) translateY(-10px) scale(1);
-        }
-
-        .custom-tooltip {
-          visibility: hidden;
-          position: absolute;
-          bottom: 100%;
-          left: 50%;
-          transform: translateX(-50%) translateY(0) scale(0.8);
-          background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-          color: white;
-          padding: 8px 12px;
-          border-radius: 10px;
-          font-size: 11px;
-          font-weight: 600;
-          width: 120px;
-          white-space: normal;
-          text-align: center;
-          line-height: 1.3;
-          z-index: 1000;
-          opacity: 0;
-          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4), 0 0 15px rgba(168, 85, 247, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          pointer-events: none;
-        }
-
-        .custom-tooltip::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          margin-left: -5px;
-          border-width: 5px;
-          border-style: solid;
-          border-color: #a855f7 transparent transparent transparent;
+          box-shadow: 0 0 12px var(--status-online);
         }
 
         .sidebar-label {
-          font-size: 10px;
-          font-weight: 500;
-          opacity: 0.8;
-          text-align: center;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          width: 100%;
+          font-size: 13px;
+          font-weight: 600;
+          text-align: left;
+          white-space: normal;
+          line-height: 1.4;
+          flex: 1;
+          letter-spacing: 0.3px;
         }
 
         .add-button {
@@ -216,15 +242,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
           transition: all 0.3s ease;
           margin-top: 24px;
           flex-shrink: 0;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .expanded .add-button {
+          margin-left: 4px;
         }
 
         .add-button:hover {
           background: var(--card-bg-hover);
-          transform: scale(1.1) rotate(90deg);
+          transform: scale(1.05) rotate(90deg);
           border-color: var(--glass-border-bright);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
       `}} />
-    </div>
+    </motion.div>
   );
 };
 

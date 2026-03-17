@@ -138,8 +138,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSett
           padding: 24px;
           display: flex;
           flex-direction: column;
-          gap: 20px;
-          min-height: 200px;
+          gap: 16px;
+          height: 100%;
           cursor: default;
         }
 
@@ -195,8 +195,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSett
         .card-body {
           display: flex;
           justify-content: space-between;
-          align-items: flex-end;
-          flex: 1;
+          align-items: center;
+          margin: 4px 0;
         }
 
         .project-name {

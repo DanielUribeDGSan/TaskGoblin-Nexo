@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::io::{BufRead, BufReader};
+use tauri::Manager;
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -500,6 +501,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .invoke_handler(tauri::generate_handler![
             open_ide, 
@@ -511,6 +518,11 @@ pub fn run() {
             get_hostname_mappings,
             update_hostname_mapping
         ])
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
