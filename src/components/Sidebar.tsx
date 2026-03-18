@@ -99,8 +99,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
 
         .sidebar.expanded {
           align-items: flex-start;
-          padding-left: 16px;
-          padding-right: 16px;
+          padding-left: 0;
+          padding-right: 0;
         }
 
         .toggle-sidebar-btn {
@@ -142,7 +142,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
         }
 
         .expanded .sidebar-items {
-          padding: 0;
+          padding: 0 16px;
         }
 
         .sidebar-items::-webkit-scrollbar {
@@ -150,7 +150,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
         }
 
         .sidebar-items::-webkit-scrollbar-track {
-          background: transparent;
+          background: transparent !important;
         }
 
         .sidebar-items::-webkit-scrollbar-thumb {
@@ -159,7 +159,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
         }
 
         .sidebar-items:hover::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.15);
+        }
+
+        .sidebar-items {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
         }
 
         .sidebar-item {
@@ -240,13 +245,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, onAddProject
           justify-content: center;
           cursor: pointer;
           transition: all 0.3s ease;
-          margin-top: 24px;
+          margin-top: auto; /* Push to bottom but before padding-bottom */
+          margin-bottom: 0;
           flex-shrink: 0;
           box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+          align-self: center; /* Always centered */
         }
 
         .expanded .add-button {
-          margin-left: 4px;
+          margin-left: 0;
         }
 
         .add-button:hover {

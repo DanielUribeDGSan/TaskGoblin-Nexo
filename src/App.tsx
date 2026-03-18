@@ -239,15 +239,15 @@ const App: React.FC = () => {
   };
 
   const handleDeleteSnippet = (id: string) => {
-    if (window.confirm(t.snippets.deleteConfirm)) {
-      saveSnippets(snippets.filter(s => s.id !== id));
-    }
+    saveSnippets(snippets.filter(s => s.id !== id));
   };
 
   const handleDeleteEnv = (id: string) => {
-    if (window.confirm(t.envManager.deleteConfirm)) {
-      saveEnvs(envProfiles.filter(e => e.id !== id));
-    }
+    saveEnvs(envProfiles.filter(e => e.id !== id));
+  };
+
+  const handleDeleteProject = (id: string) => {
+    saveProjects(projects.filter(p => p.id !== id));
   };
 
   return (
@@ -265,6 +265,7 @@ const App: React.FC = () => {
             projects={projects} 
             onLaunch={handleLaunch} 
             onOpenSettings={handleOpenEditProjectModal}
+            onDelete={handleDeleteProject}
             onAddProject={handleOpenAddModal}
             translations={t.projects}
           />
@@ -415,6 +416,15 @@ const App: React.FC = () => {
 
         .settings-header {
           margin-bottom: 32px;
+        }
+
+        .settings-header h2 {
+          font-size: 32px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
         }
 
         .settings-grid {

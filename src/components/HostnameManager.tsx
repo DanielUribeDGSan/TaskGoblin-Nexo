@@ -3,6 +3,7 @@ import { Globe, Plus, Trash2, Shield, AlertTriangle, ExternalLink, CheckCircle2,
 import { invoke } from '@tauri-apps/api/core';
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { motion, AnimatePresence } from 'framer-motion';
+import { containerVariants, itemVariants, listVariants } from '../constants/animations';
 
 interface PortInfo {
   port: string;
@@ -34,6 +35,7 @@ interface HostnameManagerProps {
     linkPort: string;
     resultingUrl: string;
     hidePort: string;
+    searchPlaceholder: string;
   };
 }
 
@@ -48,6 +50,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
   const [portMappings, setPortMappings] = useState<Record<string, { port: string; hidePort: boolean; ip?: string }>>({});
   const [portSearch, setPortSearch] = useState('');
   const [hidePort, setHidePort] = useState(false);
+  const [mainSearch, setMainSearch] = useState('');
 
   const store = new LazyStore("nexo_hostname_ports.json");
 
@@ -58,7 +61,6 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
       
       const savedMappings = await store.get<Record<string, any>>("mappings");
       if (savedMappings) {
-        // Migration/Cleanup
         const migrated: Record<string, { port: string; hidePort: boolean; ip?: string }> = {};
         Object.entries(savedMappings).forEach(([hostname, value]) => {
           if (typeof value === 'string') {
@@ -86,7 +88,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
   useEffect(() => {
     fetchMappings();
     fetchPorts();
-    const interval = setInterval(fetchPorts, 10000); // Check ports every 10s
+    const interval = setInterval(fetchPorts, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -97,16 +99,12 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
 
   const handleAdd = async () => {
     if (!newAlias) return;
-    
     const fullHostname = newAlias.trim();
-    
     setError(null);
     setLoading(true);
     try {
       let targetIp = "127.0.0.1";
-      
       if (hidePort) {
-        // Assign a unique loopback IP (127.0.0.2 - 127.0.0.254)
         const usedIps = new Set(Object.values(portMappings).map(m => m.ip).filter(Boolean));
         for (let i = 2; i < 255; i++) {
           const testIp = `127.0.0.${i}`;
@@ -124,7 +122,6 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
         targetPort: selectedPort || null
       });
       
-      // Save association
       const updated = { 
         ...portMappings, 
         [fullHostname]: { 
@@ -140,7 +137,6 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
       setNewAlias('');
       setSelectedPort('');
       setHidePort(false);
-      setPortSearch('');
       setSuccess(translations.successAdd);
       setTimeout(() => setSuccess(null), 3000);
       fetchMappings();
@@ -153,8 +149,8 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
   };
 
   const handleRemove = async (hostname: string) => {
-    if (!confirm(translations.removeConfirm)) return;
-
+    const isMac = navigator.userAgent.toLowerCase().includes('mac');
+    if (!isMac && !confirm(translations.removeConfirm)) return;
     setLoading(true);
     try {
       const mapping = portMappings[hostname];
@@ -165,7 +161,6 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
         targetPort: mapping?.port || null
       });
       
-      // Remove port association
       const updated = { ...portMappings };
       delete updated[hostname];
       setPortMappings(updated);
@@ -183,17 +178,27 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
     }
   };
 
+  const filteredHostnames = hostnames.filter(h => 
+    h.hostname.toLowerCase().includes(mainSearch.toLowerCase()) ||
+    (portMappings[h.hostname]?.port && portMappings[h.hostname].port.includes(mainSearch))
+  );
+
   return (
-    <div className="hostname-view">
-      <header className="page-header">
+    <motion.div 
+      className="hostname-view"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.header className="page-header" variants={itemVariants}>
         <div className="header-content">
           <h1>{translations.title}</h1>
           <p className="subtitle">{translations.subtitle}</p>
         </div>
-      </header>
+      </motion.header>
 
-      <div className="hostname-grid">
-        <div className="host-controls glass-card">
+      <motion.div className="hostname-grid" variants={containerVariants}>
+        <motion.div className="host-controls glass-card" variants={itemVariants}>
           <section className="input-section">
             <label className="section-label">
               <Globe size={18} />
@@ -306,80 +311,139 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        <div className="host-list-container glass-card">
+        <motion.div className="host-list-container glass-card" variants={itemVariants}>
           <div className="list-header">
             <h3>{translations.activeTitle}</h3>
             <span className="count-badge">{hostnames.length}</span>
           </div>
 
-          <div className="host-list">
-            {hostnames.length === 0 ? (
-              <div className="empty-state">
-                <Globe size={48} className="empty-icon" />
-                <p>{translations.noMappings}</p>
-              </div>
-            ) : (
-              hostnames.map((entry) => {
-                const mapping = portMappings[entry.hostname];
-                const port = mapping?.port;
-                const shouldHidePort = mapping?.hidePort;
-                const displayUrlPort = port && !shouldHidePort ? `:${port}` : '';
-                const displayUrl = `http://${entry.hostname}${displayUrlPort}`;
-                
-                return (
-                  <div key={entry.hostname} className="host-item glass-card">
-                    <div className="host-info">
-                      <span className="host-alias">{displayUrl}</span>
-                      <span className="host-ip">{mapping?.ip || entry.ip} mapping</span>
-                    </div>
-                    <div className="host-actions">
-                      <button 
-                        className="action-btn remove-btn"
-                        onClick={() => handleRemove(entry.hostname)}
-                        disabled={loading}
-                        title="Eliminar"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                      <a 
-                        href={displayUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="action-btn link-btn"
-                        title="Abrir en navegador"
-                      >
-                        <ExternalLink size={16} />
-                      </a>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
+          <motion.div className="main-search-bar" variants={itemVariants}>
+            <Search size={18} className="search-icon" />
+            <input 
+              type="text" 
+              placeholder={translations.searchPlaceholder} 
+              value={mainSearch}
+              onChange={(e) => setMainSearch(e.target.value)}
+            />
+          </motion.div>
+
+          <motion.div className="host-list" variants={listVariants}>
+            <AnimatePresence mode="popLayout">
+              {filteredHostnames.length === 0 ? (
+                <motion.div key="empty" className="empty-state" variants={itemVariants}>
+                  <Globe size={48} className="empty-icon" />
+                  <p>{mainSearch ? "No se encontraron resultados" : translations.noMappings}</p>
+                </motion.div>
+              ) : (
+                filteredHostnames.map((entry) => {
+                  const mapping = portMappings[entry.hostname];
+                  const port = mapping?.port;
+                  const shouldHidePort = mapping?.hidePort;
+                  const displayUrlPort = port && !shouldHidePort ? `:${port}` : '';
+                  const displayUrl = `http://${entry.hostname}${displayUrlPort}`;
+                  
+                  return (
+                    <motion.div 
+                      key={entry.hostname} 
+                      className="host-item glass-card"
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.01 }}
+                    >
+                      <div className="host-info">
+                        <span className="host-alias">{displayUrl}</span>
+                        <span className="host-ip">{mapping?.ip || entry.ip} mapping</span>
+                      </div>
+                      <div className="host-actions">
+                        <button 
+                          className="action-btn remove-btn"
+                          onClick={() => handleRemove(entry.hostname)}
+                          disabled={loading}
+                          title="Eliminar"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                        <a 
+                          href={displayUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="action-btn link-btn"
+                          title="Abrir en navegador"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      </motion.div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .hostname-view {
           padding: 40px;
           height: 100%;
           overflow-y: auto;
-          animation: fadeIn 0.5s ease-out;
+        }
+
+        .page-header {
+          margin-bottom: 32px;
+        }
+
+        .header-content h1 {
+          font-size: 32px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+          color: var(--text-secondary);
+          opacity: 0.8;
+          max-width: 600px;
         }
 
         .hostname-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 24px;
-          margin-top: 10px;
         }
 
         @media (max-width: 950px) {
           .hostname-grid {
             grid-template-columns: 1fr;
           }
+        }
+
+        .main-search-bar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 16px;
+          margin-bottom: 16px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 12px;
+          border: 1px solid var(--glass-border);
+        }
+
+        .main-search-bar .search-icon {
+          color: var(--text-secondary);
+          opacity: 0.5;
+        }
+
+        .main-search-bar input {
+          background: none;
+          border: none;
+          color: var(--text-primary);
+          width: 100%;
+          font-size: 14px;
+          outline: none;
         }
 
         .host-controls {
@@ -395,10 +459,14 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
           gap: 16px;
         }
 
-        .alias-input-group {
+        .section-label {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
+          font-size: 16px;
+          font-weight: 500;
+          color: var(--text-primary);
+          margin-bottom: 12px;
         }
 
         .alias-input {
@@ -574,6 +642,9 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
           display: flex;
           flex-direction: column;
           gap: 12px;
+          max-height: 480px;
+          overflow-y: auto;
+          padding-right: 8px;
         }
 
         .host-item {
@@ -605,6 +676,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
           color: var(--text-secondary);
           opacity: 0.6;
           font-family: monospace;
+          background: none;
         }
 
         .host-actions {
@@ -663,7 +735,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
           to { transform: rotate(360deg); }
         }
       `}} />
-    </div>
+    </motion.div>
   );
 };
 

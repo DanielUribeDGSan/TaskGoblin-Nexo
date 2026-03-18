@@ -178,11 +178,29 @@ const ShareProject: React.FC<ShareProjectProps> = ({ translations }) => {
           animation: fadeIn 0.5s ease-out;
         }
 
+        .page-header {
+          margin-bottom: 32px;
+        }
+
+        .header-content h1 {
+          font-size: 32px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+          color: var(--text-secondary);
+          opacity: 0.8;
+          max-width: 600px;
+        }
+
         .share-grid {
           display: grid;
           grid-template-columns: 1fr 340px;
           gap: 24px;
-          margin-top: 10px;
         }
 
         @media (max-width: 950px) {

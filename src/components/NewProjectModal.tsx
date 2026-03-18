@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, AlertCircle, Folder, FileText, ChevronDown } from 'lucide-react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from './ProjectCard';
@@ -99,16 +99,15 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onAd
     }
   }, [initialData, isOpen]);
 
-  const handlePickFolder = async (setter: (p: string) => void, autoNameIfEmpty: boolean = false) => {
+  const handlePickPath = async (setter: (p: string) => void, mode: 'folder' | 'file', autoNameIfEmpty: boolean = false) => {
+    const isDirectory = mode === 'folder';
     const selected = await open({
-      directory: false, // Allow files
+      directory: isDirectory,
       multiple: false,
-      title: 'Select Project Folder or File',
-      // Adding common project file filters
-      filters: [
-        { name: 'All Files', extensions: ['*'] },
-        { name: 'Solutions', extensions: ['sln', 'csproj'] },
-        { name: 'Web', extensions: ['json', 'html'] }
+      title: isDirectory ? 'Select Project Folder' : 'Select Project File',
+      filters: isDirectory ? [] : [
+        { name: 'Common Project Files', extensions: ['csproj', 'sln', 'json', 'html', 'js', 'ts', 'py', 'go', 'rs'] },
+        { name: 'All Files', extensions: ['*'] }
       ]
     });
     if (selected && typeof selected === 'string') {
@@ -124,6 +123,51 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onAd
         setName(fileName);
       }
     }
+  };
+
+  const PathPicker: React.FC<{ 
+    onSelect: (mode: 'folder' | 'file') => void; 
+    size?: number;
+    title?: string;
+  }> = ({ onSelect, size = 18, title = "Select Path" }) => {
+    const [showMenu, setShowMenu] = useState(false);
+
+    return (
+      <div className="path-picker-container">
+        <button 
+          type="button" 
+          onClick={() => setShowMenu(!showMenu)} 
+          className="glass-button glass-button-secondary picker-btn main-picker-btn"
+          title={title}
+        >
+          <Folder size={size} />
+          <ChevronDown size={12} className={`chevron ${showMenu ? 'open' : ''}`} />
+        </button>
+        
+        <AnimatePresence>
+          {showMenu && (
+            <>
+              <div className="menu-backdrop" onClick={() => setShowMenu(false)} />
+              <motion.div 
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="picker-menu glass-panel"
+              >
+                <button type="button" onClick={() => { onSelect('folder'); setShowMenu(false); }}>
+                  <Folder size={14} />
+                  <span>Carpeta</span>
+                </button>
+                <button type="button" onClick={() => { onSelect('file'); setShowMenu(false); }}>
+                  <FileText size={14} />
+                  <span>Archivo</span>
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      </div>
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -240,9 +284,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onAd
                     placeholder="/path/to/project"
                     className="glass-input"
                   />
-                  <button type="button" onClick={() => handlePickFolder(setPath, true)} className="glass-button glass-button-secondary">
-                    {translations.browse}
-                  </button>
+                  <PathPicker onSelect={(mode) => handlePickPath(setPath, mode, true)} title="Seleccionar Ruta" />
                 </div>
               </div>
 
@@ -384,13 +426,11 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onAd
                         placeholder="/path/to/subproject"
                         className="glass-input"
                       />
-                      <button
-                        type="button"
-                        onClick={() => handlePickFolder((p) => updateSubProject(sp.id, { path: p }))}
-                        className="glass-button glass-button-secondary"
-                      >
-                        {translations.browse}
-                      </button>
+                      <PathPicker 
+                        onSelect={(mode) => handlePickPath((p) => updateSubProject(sp.id, { path: p }), mode)} 
+                        size={16} 
+                        title="Seleccionar Ruta Sub-proyecto" 
+                      />
                     </div>
                     <div className="form-row">
                       <div className="form-group flex-1">
@@ -551,6 +591,82 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({ isOpen, onClose, onAd
             }
 
             .path-input-group input {
+              flex: 1;
+            }
+
+            .picker-btn {
+              padding: 0;
+              width: 44px;
+              height: 100%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .path-picker-container {
+              position: relative;
+            }
+
+            .main-picker-btn {
+              gap: 4px;
+              width: auto;
+              padding: 0 10px;
+            }
+
+            .chevron {
+              transition: transform 0.2s ease;
+              opacity: 0.6;
+            }
+
+            .chevron.open {
+              transform: rotate(180deg);
+            }
+
+            .menu-backdrop {
+              position: fixed;
+              inset: 0;
+              z-index: 90;
+            }
+
+            .picker-menu {
+              position: absolute;
+              top: calc(100% + 8px);
+              right: 0;
+              width: 140px;
+              background: rgba(30, 30, 40, 0.95);
+              backdrop-filter: blur(12px);
+              border: 1px solid var(--glass-border-bright);
+              border-radius: 12px;
+              padding: 6px;
+              display: flex;
+              flex-direction: column;
+              gap: 4px;
+              z-index: 100;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            }
+
+            .picker-menu button {
+              background: none;
+              border: none;
+              color: var(--text-primary);
+              padding: 8px 12px;
+              border-radius: 8px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              cursor: pointer;
+              font-size: 13px;
+              transition: all 0.2s ease;
+              text-align: left;
+              width: 100%;
+            }
+
+            .picker-menu button:hover {
+              background: rgba(255, 255, 255, 0.1);
+              color: var(--status-online);
+            }
+
+            .picker-menu button span {
               flex: 1;
             }
 

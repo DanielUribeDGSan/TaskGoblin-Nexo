@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Copy, Edit, Trash2, Plus, Check } from 'lucide-react';
+import { Search, Plus, Copy, Trash2, Edit2, Check } from 'lucide-react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
+import { containerVariants, itemVariants, listVariants } from '../constants/animations';
 import { CommandSnippet } from '../types';
 
 interface SnippetManagerProps {
@@ -16,6 +18,8 @@ interface SnippetManagerProps {
     noSnippets: string;
     commandsLabel: string;
     editSnippet: string;
+    deleteConfirm: string;
+    searchPlaceholder: string;
   };
 }
 
@@ -27,6 +31,12 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
   translations 
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredSnippets = snippets.filter(s => 
+    s.title.toLowerCase().includes(search.toLowerCase()) ||
+    s.commands.some(cmd => cmd.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const handleCopy = (command: string, id: string) => {
     navigator.clipboard.writeText(command);
@@ -35,32 +45,63 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
   };
 
   return (
-    <div className="snippet-manager-view">
-      <header className="page-header">
-        <div className="header-content">
+    <motion.div 
+      className="snippet-manager"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div className="snippet-header-section" variants={itemVariants}>
+        <div className="header-info">
           <h1>{translations.title}</h1>
           <p className="subtitle">{translations.subtitle}</p>
         </div>
-      </header>
+      </motion.div>
+      
+      <motion.div className="search-bar glass-card" variants={itemVariants}>
+        <Search size={20} className="search-icon" />
+        <input 
+          type="text" 
+          placeholder={translations.searchPlaceholder} 
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </motion.div>
 
-      <div className="snippets-grid">
+      <motion.div className="snippets-grid" variants={listVariants}>
         <AnimatePresence mode="popLayout">
-          {snippets.map((snippet) => (
+          {filteredSnippets.map((snippet) => (
             <motion.div 
               key={snippet.id}
               layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card snippet-card"
+              className="snippet-card glass-panel"
+              variants={itemVariants}
+              whileHover={{ scale: 1.01 }}
             >
               <div className="snippet-header">
                 <h3>{snippet.title}</h3>
                 <div className="snippet-actions">
-                  <button onClick={() => onEdit(snippet)} className="action-icon-btn edit">
-                    <Edit size={16} />
+                  <button onClick={() => onEdit(snippet)} className="action-icon-btn edit" title={translations.editSnippet}>
+                    <Edit2 size={16} />
                   </button>
-                  <button onClick={() => onDelete(snippet.id)} className="action-icon-btn delete">
+                  <button 
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const confirmed = await ask(translations.deleteConfirm, {
+                        title: translations.title,
+                        kind: 'warning',
+                        okLabel: 'Sí',
+                        cancelLabel: 'No',
+                      });
+                      if (confirmed) {
+                        onDelete(snippet.id);
+                      }
+                    }} 
+                    className="action-icon-btn delete" 
+                    title="Delete"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -91,6 +132,7 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
         </AnimatePresence>
 
         <motion.button 
+          variants={itemVariants}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="glass-card add-snippet-card"
@@ -100,26 +142,22 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
             <div className="add-icon-circle">
               <Plus size={32} />
             </div>
-            <div className="add-text">
-              <h3>{translations.newSnippet}</h3>
-            </div>
+            <h3>{translations.newSnippet}</h3>
           </div>
         </motion.button>
-      </div>
+      </motion.div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .snippet-manager-view {
+        .snippet-manager {
           padding: 40px;
           height: 100%;
           overflow-y: auto;
-          animation: fadeIn 0.5s ease-out;
+          display: flex;
+          flex-direction: column;
+          gap: 32px;
         }
 
-        .page-header {
-          margin-bottom: 32px;
-        }
-
-        .page-header h1 {
+        .snippet-header-section h1 {
           font-size: 32px;
           font-weight: 700;
           margin-bottom: 8px;
@@ -132,6 +170,31 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
           color: var(--text-secondary);
           opacity: 0.8;
           max-width: 600px;
+        }
+
+        .search-bar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 20px;
+          margin-bottom: 12px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--glass-border);
+        }
+
+        .search-icon {
+          color: var(--text-secondary);
+          opacity: 0.5;
+        }
+
+        .search-bar input {
+          background: none;
+          border: none;
+          color: var(--text-primary);
+          width: 100%;
+          font-size: 16px;
+          outline: none;
         }
 
         .snippets-grid {
@@ -294,19 +357,8 @@ const SnippetManager: React.FC<SnippetManagerProps> = ({
           background: rgba(255, 255, 255, 0.05);
           color: var(--text-secondary);
         }
-
-        .add-text h3 {
-          font-size: 18px;
-          font-weight: 600;
-          color: var(--text-primary);
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
       `}} />
-    </div>
+    </motion.div>
   );
 };
 

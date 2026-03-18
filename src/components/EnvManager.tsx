@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Copy, Download, Check, FileCode, Edit } from 'lucide-react';
+import { Plus, Trash2, Copy, Download, Check, FileCode, Edit, Search } from 'lucide-react';
+import { ask } from '@tauri-apps/plugin-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
+import { containerVariants, itemVariants, listVariants } from '../constants/animations';
 import { writeTextFile, BaseDirectory } from '@tauri-apps/plugin-fs';
 import { EnvProfile } from '../types';
 
@@ -19,6 +21,7 @@ interface EnvManagerProps {
     saveError: string;
     copySuccess: string;
     deleteConfirm: string;
+    searchPlaceholder: string;
   };
 }
 
@@ -31,6 +34,12 @@ const EnvManager: React.FC<EnvManagerProps> = ({
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredProfiles = profiles.filter(p => 
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
+    p.variables.some(v => v.key.toLowerCase().includes(search.toLowerCase()) || v.value.toLowerCase().includes(search.toLowerCase()))
+  );
 
   const generateEnvContent = (profile: EnvProfile) => {
     return profile.variables
@@ -64,24 +73,41 @@ const EnvManager: React.FC<EnvManagerProps> = ({
   };
 
   return (
-    <div className="env-manager-view">
-      <header className="page-header">
-        <div className="header-content">
+    <motion.div 
+      className="env-manager"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div className="env-header-section" variants={itemVariants}>
+        <div className="header-info">
           <h1>{translations.title}</h1>
           <p className="subtitle">{translations.subtitle}</p>
         </div>
-      </header>
+      </motion.div>
+      
+      <motion.div className="search-bar glass-card" variants={itemVariants}>
+        <Search size={20} className="search-icon" />
+        <input 
+          type="text" 
+          placeholder={translations.searchPlaceholder} 
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </motion.div>
 
-      <div className="envs-grid">
+      <motion.div className="env-grid" variants={listVariants}>
         <AnimatePresence mode="popLayout">
-          {profiles.map((profile) => (
+          {filteredProfiles.map((profile) => (
             <motion.div 
               key={profile.id}
+              className="env-card glass-panel"
+              variants={itemVariants}
+              whileHover={{ scale: 1.01 }}
               layout
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card env-profile-card"
             >
               <div className="profile-header">
                 <div className="title-section">
@@ -92,7 +118,23 @@ const EnvManager: React.FC<EnvManagerProps> = ({
                   <button onClick={() => onEdit(profile)} className="action-icon-btn edit">
                     <Edit size={16} />
                   </button>
-                  <button onClick={() => onDelete(profile.id)} className="action-icon-btn delete">
+                  <button 
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      const confirmed = await ask(translations.deleteConfirm, {
+                        title: translations.title,
+                        kind: 'warning',
+                        okLabel: 'Sí',
+                        cancelLabel: 'No',
+                      });
+                      if (confirmed) {
+                        onDelete(profile.id);
+                      }
+                    }} 
+                    className="action-icon-btn delete"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -132,6 +174,7 @@ const EnvManager: React.FC<EnvManagerProps> = ({
         </AnimatePresence>
 
         <motion.button 
+          variants={itemVariants}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="glass-card add-env-card"
@@ -146,23 +189,65 @@ const EnvManager: React.FC<EnvManagerProps> = ({
             </div>
           </div>
         </motion.button>
-      </div>
+      </motion.div>
 
       <style dangerouslySetInnerHTML={{ __html: `
-        .env-manager-view {
+        .env-manager {
           padding: 40px;
           height: 100%;
           overflow-y: auto;
-          animation: fadeIn 0.5s ease-out;
+          display: flex;
+          flex-direction: column;
+          gap: 32px;
         }
 
-        .envs-grid {
+        .env-header-section h1 {
+          font-size: 32px;
+          font-weight: 700;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+          color: var(--text-secondary);
+          opacity: 0.8;
+          max-width: 600px;
+        }
+
+        .search-bar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 20px;
+          margin-bottom: 12px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--glass-border);
+        }
+
+        .search-icon {
+          color: var(--text-secondary);
+          opacity: 0.5;
+        }
+
+        .search-bar input {
+          background: none;
+          border: none;
+          color: var(--text-primary);
+          width: 100%;
+          font-size: 16px;
+          outline: none;
+        }
+
+        .env-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
           gap: 24px;
         }
 
-        .env-profile-card {
+        .env-card {
           padding: 24px;
           display: flex;
           flex-direction: column;
@@ -303,7 +388,7 @@ const EnvManager: React.FC<EnvManagerProps> = ({
           to { opacity: 1; transform: translateY(0); }
         }
       `}} />
-    </div>
+    </motion.div>
   );
 };
 

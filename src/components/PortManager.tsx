@@ -231,13 +231,14 @@ const PortManager: React.FC<PortManagerProps> = ({ translations, projects, onLau
           font-size: 32px;
           font-weight: 700;
           margin-bottom: 8px;
-          background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+          background: linear-gradient(135deg, #fff 0%, #a855f7 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
           color: var(--text-secondary);
+          opacity: 0.8;
           max-width: 600px;
         }
 

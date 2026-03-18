@@ -1,6 +1,7 @@
 import React from 'react';
-import { Play, Settings, Command, Globe, FolderCode, Terminal } from 'lucide-react';
+import { Play, Settings, Command, Globe, FolderCode, Terminal, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ask } from '@tauri-apps/plugin-dialog';
 
 
 export interface SubProject {
@@ -38,10 +39,12 @@ interface ProjectCardProps {
     stopped: string;
     building: string;
     launching: string;
+    deleteConfirm: string;
   };
+  onDelete: (id: string) => void;
 }
 
-const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSettings, translations }) => {
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSettings, onDelete, translations }) => {
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'Online': return 'var(--status-online)';
@@ -80,15 +83,36 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSett
           />
           <span className="status-text">{getStatusTranslation(project.status)}</span>
         </div>
-        <button 
-          className="settings-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenSettings(project);
-          }}
-        >
-          <Settings size={18} />
-        </button>
+        <div className="header-actions">
+          <button 
+            className="settings-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSettings(project);
+            }}
+          >
+            <Settings size={18} />
+          </button>
+          <button 
+            type="button"
+            className="delete-btn"
+            onClick={async (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              const confirmed = await ask(translations.deleteConfirm, {
+                title: 'Nexo',
+                kind: 'warning',
+                okLabel: 'Sí',
+                cancelLabel: 'No',
+              });
+              if (confirmed) {
+                onDelete(project.id);
+              }
+            }}
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="card-body">
@@ -173,23 +197,36 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onLaunch, onOpenSett
           color: var(--text-secondary);
         }
 
-        .settings-btn {
+        .header-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .settings-btn, .delete-btn {
           background: none;
           border: none;
           color: var(--text-secondary);
           cursor: pointer;
           opacity: 0;
-          transform: rotate(-20deg);
           transition: all 0.3s ease;
         }
 
-        .project-card:hover .settings-btn {
+        .settings-btn {
+          transform: rotate(-20deg);
+        }
+
+        .project-card:hover .settings-btn,
+        .project-card:hover .delete-btn {
           opacity: 1;
           transform: rotate(0deg);
         }
 
         .settings-btn:hover {
           color: var(--text-primary);
+        }
+
+        .delete-btn:hover {
+          color: #ff4444;
         }
 
         .card-body {

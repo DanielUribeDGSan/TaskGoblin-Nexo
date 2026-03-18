@@ -21,7 +21,9 @@ export const translations = {
         stopped: "Stopped",
         building: "Building",
         launching: "Launching"
-      }
+      },
+      searchPlaceholder: "Search projects...",
+      deleteConfirm: "Are you sure you want to delete this project? This action cannot be undone."
     },
     modal: {
       title: "Add New Project",
@@ -92,7 +94,8 @@ export const translations = {
       selectPort: "Select active port (optional)",
       linkPort: "Link to Port",
       resultingUrl: "Resulting Friendly URL",
-      hidePort: "Hide port in the URL (Experimental)"
+      hidePort: "Hide port in the URL (Experimental)",
+      searchPlaceholder: "Search mappings..."
     },
     snippets: {
       title: "Command Snippets",
@@ -105,7 +108,8 @@ export const translations = {
       copySuccess: "Command copied to clipboard!",
       noSnippets: "No snippets added yet. Click 'New Snippet' to start.",
       editSnippet: "Edit Snippet",
-      deleteConfirm: "Are you sure you want to delete this snippet?"
+      deleteConfirm: "Are you sure you want to delete this snippet?",
+      searchPlaceholder: "Search snippets..."
     },
     envManager: {
       title: ".env Manager",
@@ -123,7 +127,8 @@ export const translations = {
       copySuccess: "Content copied to clipboard!",
       deleteConfirm: "Are you sure you want to delete this .env profile?",
       saveProfile: "Save Profile",
-      updateProfile: "Update Profile"
+      updateProfile: "Update Profile",
+      searchPlaceholder: "Search profiles..."
     }
   },
   es: {
@@ -148,7 +153,9 @@ export const translations = {
         stopped: "Detenido",
         building: "Construyendo",
         launching: "Lanzando"
-      }
+      },
+      searchPlaceholder: "Buscar proyectos...",
+      deleteConfirm: "¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer."
     },
     modal: {
       title: "Añadir Nuevo Proyecto",
@@ -219,7 +226,8 @@ export const translations = {
       selectPort: "Seleccionar puerto activo (opcional)",
       linkPort: "Vincular a Puerto",
       resultingUrl: "URL Amigable Resultante",
-      hidePort: "Quitar puerto de la URL (Experimental)"
+      hidePort: "Quitar puerto de la URL (Experimental)",
+      searchPlaceholder: "Buscar mapeos..."
     },
     snippets: {
       title: "Snippets de Comandos",
@@ -232,7 +240,8 @@ export const translations = {
       copySuccess: "¡Comando copiado al portapapeles!",
       noSnippets: "Aún no hay snippets. Haz clic en 'Nuevo Snippet' para empezar.",
       editSnippet: "Editar Snippet",
-      deleteConfirm: "¿Estás seguro de que deseas eliminar este snippet?"
+      deleteConfirm: "¿Estás seguro de que deseas eliminar este snippet?",
+      searchPlaceholder: "Buscar snippets..."
     },
     envManager: {
       title: "Gestión de .env",
@@ -250,7 +259,8 @@ export const translations = {
       copySuccess: "¡Contenido copiado al portapapeles!",
       deleteConfirm: "¿Estás seguro de que deseas eliminar este perfil de .env?",
       saveProfile: "Guardar Perfil",
-      updateProfile: "Actualizar Perfil"
+      updateProfile: "Actualizar Perfil",
+      searchPlaceholder: "Buscar perfiles..."
     }
   }
 };

@@ -1,12 +1,14 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import ProjectCard, { Project } from './ProjectCard';
 import { motion, AnimatePresence } from 'framer-motion';
+import { containerVariants, itemVariants, listVariants } from '../constants/animations';
 
 interface ProjectGridProps {
   projects: Project[];
   onLaunch: (project: Project) => void;
   onOpenSettings: (project: Project) => void;
+  onDelete: (id: string) => void;
   onAddProject: () => void;
   translations: {
     noProjects: string;
@@ -20,13 +22,28 @@ interface ProjectGridProps {
       building: string;
       launching: string;
     }
+    searchPlaceholder: string;
+    deleteConfirm: string;
   };
 }
 
-const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSettings, onAddProject, translations }) => {
+const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSettings, onDelete, onAddProject, translations }) => {
+  const [search, setSearch] = React.useState('');
+
+  const filteredProjects = projects.filter(p => 
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.path.toLowerCase().includes(search.toLowerCase()) ||
+    (p.framework && p.framework.toLowerCase().includes(search.toLowerCase()))
+  );
+
   return (
-    <div className="grid-container">
-      <header className="grid-header">
+    <motion.div 
+      className="grid-container"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.header className="grid-header" variants={itemVariants}>
         <div className="hero-section">
           <div className="hero-title-wrapper">
             <motion.img 
@@ -46,22 +63,35 @@ const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSet
           </div>
           <p className="hero-subtitle">{translations.heroSubtitle}</p>
         </div>
-      </header>
+      </motion.header>
+      
+      <motion.div className="search-bar glass-card" variants={itemVariants}>
+        <Search size={20} className="search-icon" />
+        <input 
+          type="text" 
+          placeholder={translations.searchPlaceholder} 
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </motion.div>
 
-      <div className="projects-grid">
+      <motion.div className="projects-grid" variants={listVariants}>
         <AnimatePresence mode="popLayout">
-          {projects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project} 
-              onLaunch={onLaunch} 
-              onOpenSettings={onOpenSettings} 
-              translations={translations.status}
-            />
+          {filteredProjects.map((project) => (
+            <motion.div key={project.id} variants={itemVariants}>
+              <ProjectCard 
+                project={project} 
+                onLaunch={onLaunch} 
+                onOpenSettings={onOpenSettings} 
+                onDelete={onDelete}
+                translations={{...translations.status, deleteConfirm: translations.deleteConfirm}}
+              />
+            </motion.div>
           ))}
         </AnimatePresence>
 
         <motion.button 
+          variants={itemVariants}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           className="glass-card add-project-card"
@@ -76,7 +106,7 @@ const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSet
             </div>
           </div>
         </motion.button>
-      </div>
+      </motion.div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .grid-container {
@@ -128,6 +158,30 @@ const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSet
           opacity: 0.8;
         }
 
+        .search-bar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 20px;
+          margin-bottom: 8px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        .search-icon {
+          color: var(--text-secondary);
+          opacity: 0.5;
+        }
+
+        .search-bar input {
+          background: none;
+          border: none;
+          color: var(--text-primary);
+          width: 100%;
+          font-size: 16px;
+          outline: none;
+        }
+
         .projects-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -135,7 +189,7 @@ const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSet
         }
 
         .add-project-card {
-          height: 100%;
+          min-height: 240px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -184,7 +238,7 @@ const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onLaunch, onOpenSet
           opacity: 0.6;
         }
       `}} />
-    </div>
+    </motion.div>
   );
 };
 
