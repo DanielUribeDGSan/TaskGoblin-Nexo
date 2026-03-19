@@ -95,7 +95,8 @@ export const translations = {
       linkPort: "Link to Port",
       resultingUrl: "Resulting Friendly URL",
       hidePort: "Hide port in the URL (Experimental)",
-      searchPlaceholder: "Search mappings..."
+      searchPlaceholder: "Search mappings...",
+      viteTip: "For friendly URLs to work, your server (Vite) must run with <code>-- --host</code> (e.g., <code>npm run dev -- --host</code>)."
     },
     snippets: {
       title: "Command Snippets",
@@ -227,7 +228,8 @@ export const translations = {
       linkPort: "Vincular a Puerto",
       resultingUrl: "URL Amigable Resultante",
       hidePort: "Quitar puerto de la URL (Experimental)",
-      searchPlaceholder: "Buscar mapeos..."
+      searchPlaceholder: "Buscar mapeos...",
+      viteTip: "Para que las URLs amigables funcionen, tu servidor (Vite) debe correr con <code>-- --host</code> (ejemplo: <code>npm run dev -- --host</code>)."
     },
     snippets: {
       title: "Snippets de Comandos",

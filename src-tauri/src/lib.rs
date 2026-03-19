@@ -1,9 +1,7 @@
-use std::process::{Command, Child, Stdio};
+use std::process::Command;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::io::{BufRead, BufReader};
 use tauri::Manager;
 
 
@@ -320,80 +318,117 @@ fn get_hostname_mappings() -> Result<Vec<HostnameEntry>, String> {
 }
 
 #[tauri::command]
-async fn update_hostname_mapping(hostname: String, remove: bool, ip: String, target_port: Option<String>) -> Result<(), String> {
-    let actual_path = if cfg!(target_os = "windows") {
+fn get_raw_hosts_content() -> Result<String, String> {
+    let hosts_path = if cfg!(target_os = "windows") {
+        r"C:\Windows\System32\drivers\etc\hosts"
+    } else {
+        "/etc/hosts"
+    };
+    fs::read_to_string(hosts_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn flush_dns() -> Result<(), String> {
+    if cfg!(target_os = "macos") {
+        Command::new("osascript")
+            .args(["-e", "do shell script \"dscacheutil -flushcache; killall -HUP mDNSResponder\" with administrator privileges"])
+            .status()
+            .map_err(|e| e.to_string())?;
+    } else if cfg!(target_os = "windows") {
+        Command::new("ipconfig")
+            .arg("/flushdns")
+            .status()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FirewallRule {
+    pub ip: String,
+    pub target_port: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SystemConfig {
+    pub hosts_content: String,
+    pub aliases: Vec<String>,
+    pub pf_rules: Vec<FirewallRule>,
+}
+
+#[tauri::command]
+async fn sync_system_configuration(config: SystemConfig) -> Result<(), String> {
+    let hosts_path = if cfg!(target_os = "windows") {
         r"C:\Windows\System32\drivers\etc\hosts"
     } else {
         "/etc/hosts"
     };
 
-    // 1. Leer y actualizar el archivo HOSTS
-    let content = fs::read_to_string(actual_path).map_err(|e| format!("Error leyendo hosts: {}", e))?;
-    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-    
-    // Limpiamos entradas previas del mismo hostname para evitar duplicados
-    lines.retain(|l| !l.contains(&hostname));
+    // 1. Crear archivos temporales
+    let temp_hosts = std::env::temp_dir().join("nexo_hosts_sync");
+    fs::write(&temp_hosts, &config.hosts_content).map_err(|e| e.to_string())?;
 
-    if !remove {
-        lines.push(format!("{} {} # Nexo Managed", ip, hostname));
-    }
-
-    let new_content = lines.join("\n") + "\n";
-    let temp_path = std::env::temp_dir().join("nexo_hosts_tmp");
-    fs::write(&temp_path, new_content).map_err(|e| e.to_string())?;
-
-    // 2. Ejecutar comandos con privilegios elevados según el SO
     if cfg!(target_os = "macos") {
-        let port = target_port.unwrap_or_else(|| "80".to_string());
-        
-        let script = if !remove {
-            // Creamos un archivo temporal para las reglas de PF (Packet Filter)
-            // La redirección (rdr) debe ir sobre la interfaz de loopback (lo0)
-            format!(
-                "do shell script \"cp '{temp}' '{hosts}' && \
-                sysctl -w net.inet.ip.forwarding=1 && \
-                echo 'rdr pass on lo0 inet proto tcp from any to {ip} port 80 -> 127.0.0.1 port {port}' > /tmp/nexo_pf.conf && \
-                pfctl -ef /tmp/nexo_pf.conf\" with administrator privileges",
-                temp = temp_path.display(),
-                hosts = actual_path,
-                ip = ip,
-                port = port
-            )
+        let mut pf_content = String::new();
+        for rule in &config.pf_rules {
+            pf_content.push_str(&format!(
+                "rdr pass on lo0 inet proto tcp from any to {} port 80 -> 127.0.0.1 port {}\n",
+                rule.ip, rule.target_port
+            ));
+        }
+        let temp_pf = std::env::temp_dir().join("nexo_pf_sync.conf");
+        fs::write(&temp_pf, pf_content).map_err(|e| e.to_string())?;
+
+        // Construir el gran script de macOS usando un Vector para evitar errores de sintaxis
+        let mut commands = vec![
+            format!("cp '{}' '{}'", temp_hosts.display(), hosts_path),
+            "sysctl -w net.inet.ip.forwarding=1".to_string(),
+            "dscacheutil -flushcache".to_string(),
+            "killall -HUP mDNSResponder".to_string(),
+        ];
+
+        // Asegurar que los aliases existan
+        for ip in &config.aliases {
+            commands.push(format!("ifconfig lo0 alias {} up", ip));
+        }
+
+        // Configurar PF
+        if config.pf_rules.is_empty() {
+            commands.push("pfctl -d || true".to_string());
         } else {
-            format!(
-                "do shell script \"cp '{temp}' '{hosts}' && pfctl -d || true\" with administrator privileges",
-                temp = temp_path.display(),
-                hosts = actual_path
-            )
-        };
+            // Limpiar reglas previas y cargar las nuevas
+            commands.push("pfctl -F all".to_string());
+            commands.push(format!("pfctl -ef '{}'", temp_pf.display()));
+        }
+
+        let script = format!(
+            "do shell script \"{}\" with administrator privileges",
+            commands.join(" && ")
+        );
 
         Command::new("osascript").arg("-e").arg(script).status().map_err(|e| e.to_string())?;
 
     } else if cfg!(target_os = "windows") {
-        let port = target_port.unwrap_or_else(|| "80".to_string());
-        
-        // En Windows usamos netsh interface portproxy
-        // Esto redirige el tráfico que llega al puerto 80 de la IP hacia el localhost:puerto
-        let powershell_cmd = if !remove {
-            format!(
-                "Start-Process powershell -ArgumentList '-Command \"\
-                Copy-Item -Path ''{temp}'' -Destination ''{hosts}'' -Force; \
-                netsh interface portproxy add v4tov4 listenport=80 listenaddress={ip} connectport={port} connectaddress=127.0.0.1\"' -Verb RunAs -Wait",
-                temp = temp_path.display(),
-                hosts = actual_path,
-                ip = ip,
-                port = port
-            )
-        } else {
-            format!(
-                "Start-Process powershell -ArgumentList '-Command \"\
-                Copy-Item -Path ''{temp}'' -Destination ''{hosts}'' -Force; \
-                netsh interface portproxy delete v4tov4 listenport=80 listenaddress={ip}\"' -Verb RunAs -Wait",
-                temp = temp_path.display(),
-                hosts = actual_path,
-                ip = ip
-            )
-        };
+        // En Windows, podríamos hacer algo similar con un script de PowerShell elevado
+        // Por simplicidad inmediata, seguimos usando portproxy individual o agrupado
+        let mut ps_commands = format!(
+            "Copy-Item -Path '{temp_h}' -Destination '{hosts}' -Force; \
+            ipconfig /flushdns",
+            temp_h = temp_hosts.display(),
+            hosts = hosts_path
+        );
+
+        for rule in &config.pf_rules {
+            ps_commands.push_str(&format!(
+                "; netsh interface portproxy add v4tov4 listenport=80 listenaddress={} connectport={} connectaddress=127.0.0.1",
+                rule.ip, rule.target_port
+            ));
+        }
+
+        let powershell_cmd = format!(
+            "Start-Process powershell -ArgumentList '-Command \"{}\"' -Verb RunAs -Wait",
+            ps_commands
+        );
 
         Command::new("powershell")
             .args(["-Command", &powershell_cmd])
@@ -401,6 +436,47 @@ async fn update_hostname_mapping(hostname: String, remove: bool, ip: String, tar
             .map_err(|e| e.to_string())?;
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+async fn update_hostname_mapping(hostname: String, remove: bool, ip: String, _target_port: Option<String>) -> Result<(), String> {
+    // Esta función queda como legado o para compatibilidad rápida sin PF
+    // Pero la idea es usar sync_system_configuration para evitar múltiples prompts
+    let actual_path = if cfg!(target_os = "windows") {
+        r"C:\Windows\System32\drivers\etc\hosts"
+    } else {
+        "/etc/hosts"
+    };
+
+    let content = fs::read_to_string(actual_path).map_err(|e| format!("Error leyendo hosts: {}", e))?;
+    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+    lines.retain(|l| !l.contains(&hostname));
+    if !remove {
+        lines.push(format!("{} {} # Nexo Managed", ip, hostname));
+    }
+    let new_content = lines.join("\n") + "\n";
+    let temp_path = std::env::temp_dir().join("nexo_hosts_tmp");
+    fs::write(&temp_path, new_content).map_err(|e| e.to_string())?;
+
+    if cfg!(target_os = "macos") {
+        let script = if !remove {
+            format!(
+                "do shell script \"cp '{temp}' '{hosts}' && ifconfig lo0 alias {ip} up || true\" with administrator privileges",
+                temp = temp_path.display(),
+                hosts = actual_path,
+                ip = ip
+            )
+        } else {
+            format!(
+                "do shell script \"cp '{temp}' '{hosts}' && ifconfig lo0 -alias {ip} || true\" with administrator privileges",
+                temp = temp_path.display(),
+                hosts = actual_path,
+                ip = ip
+            )
+        };
+        Command::new("osascript").arg("-e").arg(script).status().map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -516,7 +592,10 @@ pub fn run() {
             kill_port_process, 
             get_local_network_url,
             get_hostname_mappings,
-            update_hostname_mapping
+            update_hostname_mapping,
+            sync_system_configuration,
+            flush_dns,
+            get_raw_hosts_content
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

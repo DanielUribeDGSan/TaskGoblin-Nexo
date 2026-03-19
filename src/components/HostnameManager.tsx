@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Plus, Trash2, Shield, AlertTriangle, ExternalLink, CheckCircle2, Activity, Search } from 'lucide-react';
+import {
+  Plus,
+  Trash2,
+  Globe,
+  ExternalLink,
+  Search,
+  Info,
+  Activity,
+  Shield,
+  AlertTriangle,
+  CheckCircle2
+} from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,6 +47,7 @@ interface HostnameManagerProps {
     resultingUrl: string;
     hidePort: string;
     searchPlaceholder: string;
+    viteTip: string;
   };
 }
 
@@ -58,7 +70,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
     try {
       const mappings = await invoke<HostnameEntry[]>('get_hostname_mappings');
       setHostnames(mappings);
-      
+
       const savedMappings = await store.get<Record<string, any>>("mappings");
       if (savedMappings) {
         const migrated: Record<string, { port: string; hidePort: boolean; ip?: string }> = {};
@@ -92,10 +104,47 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredPorts = activePorts.filter(p => 
-    p.port.includes(portSearch) || 
+  const filteredPorts = activePorts.filter(p =>
+    p.port.includes(portSearch) ||
     p.process.toLowerCase().includes(portSearch.toLowerCase())
   );
+
+  const syncSystem = async (updatedMappings: Record<string, { port: string; hidePort: boolean; ip?: string }>) => {
+    // 1. Reconstruir el contenido del archivo hosts (solo las partes manejadas por Nexo)
+    // Para simplificar, obtenemos el contenido actual y reemplazamos el bloque Nexo
+    // O mejor, el backend ya lo hace, pero queremos hacerlo atómico.
+
+    // Obtenemos los hostnames base (esto es un poco circular, pero más seguro)
+    const activeEntries = Object.entries(updatedMappings).map(([hostname, m]) => ({
+      hostname,
+      ip: m.ip || "127.0.0.1"
+    }));
+
+    // El backend necesita el contenido COMPLETO deseado del archivo hosts
+    // Vamos a solicitar el contenido actual primero para preservarlo
+    const currentHosts = await invoke<string>('get_raw_hosts_content').catch(() => "");
+    let lines = currentHosts.split('\n').filter(l => !l.includes("# Nexo Managed"));
+    activeEntries.forEach(e => {
+      lines.push(`${e.ip} ${e.hostname} # Nexo Managed`);
+    });
+    const hostsContent = lines.join('\n').trim() + '\n';
+
+    const aliases = Object.values(updatedMappings)
+      .map(m => m.ip)
+      .filter((ip): ip is string => !!ip && ip !== "127.0.0.1");
+
+    const pfRules = Object.values(updatedMappings)
+      .filter(m => m.hidePort && m.ip && m.port)
+      .map(m => ({ ip: m.ip!, target_port: m.port }));
+
+    await invoke('sync_system_configuration', {
+      config: {
+        hosts_content: hostsContent,
+        aliases,
+        pf_rules: pfRules
+      }
+    });
+  };
 
   const handleAdd = async () => {
     if (!newAlias) return;
@@ -115,21 +164,17 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
         }
       }
 
-      await invoke('update_hostname_mapping', { 
-        hostname: fullHostname, 
-        remove: false,
-        ip: targetIp,
-        targetPort: selectedPort || null
-      });
-      
-      const updated = { 
-        ...portMappings, 
-        [fullHostname]: { 
-          port: selectedPort, 
+      const updated = {
+        ...portMappings,
+        [fullHostname]: {
+          port: selectedPort,
           hidePort,
           ip: targetIp === "127.0.0.1" ? undefined : targetIp
-        } 
+        }
       };
+
+      await syncSystem(updated);
+
       setPortMappings(updated);
       await store.set("mappings", updated);
       await store.save();
@@ -153,16 +198,11 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
     if (!isMac && !confirm(translations.removeConfirm)) return;
     setLoading(true);
     try {
-      const mapping = portMappings[hostname];
-      await invoke('update_hostname_mapping', { 
-        hostname, 
-        remove: true,
-        ip: mapping?.ip || "127.0.0.1",
-        targetPort: mapping?.port || null
-      });
-      
       const updated = { ...portMappings };
       delete updated[hostname];
+
+      await syncSystem(updated);
+
       setPortMappings(updated);
       await store.set("mappings", updated);
       await store.save();
@@ -178,13 +218,13 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
     }
   };
 
-  const filteredHostnames = hostnames.filter(h => 
+  const filteredHostnames = hostnames.filter(h =>
     h.hostname.toLowerCase().includes(mainSearch.toLowerCase()) ||
-    (portMappings[h.hostname]?.port && portMappings[h.hostname].port.includes(mainSearch))
+    (portMappings[h.hostname]?.port?.includes(mainSearch))
   );
 
   return (
-    <motion.div 
+    <motion.div
       className="hostname-view"
       variants={containerVariants}
       initial="hidden"
@@ -199,6 +239,11 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
 
       <motion.div className="hostname-grid" variants={containerVariants}>
         <motion.div className="host-controls glass-card" variants={itemVariants}>
+          <div className="vite-tip-box">
+            <Info size={18} />
+            <p dangerouslySetInnerHTML={{ __html: `<strong>Tip:</strong> ${translations.viteTip}` }} />
+          </div>
+
           <section className="input-section">
             <label className="section-label">
               <Globe size={18} />
@@ -221,11 +266,11 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                   <Activity size={14} />
                   <span>{translations.linkPort}</span>
                 </label>
-                
+
                 <div className="searchable-port-select">
                   <div className="port-search-input-wrapper">
                     <Search size={14} className="search-icon" />
-                    <input 
+                    <input
                       type="text"
                       placeholder="Buscar puerto o proceso..."
                       value={portSearch}
@@ -233,7 +278,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                       className="mini-search-input"
                     />
                   </div>
-                  
+
                   <select
                     value={selectedPort}
                     onChange={(e) => setSelectedPort(e.target.value)}
@@ -255,8 +300,8 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                   <div className="preview-header">
                     <span className="label">{translations.resultingUrl}</span>
                     <label className="checkbox-wrapper">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={hidePort}
                         onChange={(e) => setHidePort(e.target.checked)}
                       />
@@ -268,7 +313,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                   </code>
                 </div>
               )}
-              <button 
+              <button
                 className="glass-button glass-button-primary add-host-btn"
                 onClick={handleAdd}
                 disabled={loading || !newAlias}
@@ -289,7 +334,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
 
           <AnimatePresence>
             {error && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
@@ -300,7 +345,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
               </motion.div>
             )}
             {success && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
@@ -321,9 +366,9 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
 
           <motion.div className="main-search-bar" variants={itemVariants}>
             <Search size={18} className="search-icon" />
-            <input 
-              type="text" 
-              placeholder={translations.searchPlaceholder} 
+            <input
+              type="text"
+              placeholder={translations.searchPlaceholder}
               value={mainSearch}
               onChange={(e) => setMainSearch(e.target.value)}
             />
@@ -343,10 +388,10 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                   const shouldHidePort = mapping?.hidePort;
                   const displayUrlPort = port && !shouldHidePort ? `:${port}` : '';
                   const displayUrl = `http://${entry.hostname}${displayUrlPort}`;
-                  
+
                   return (
-                    <motion.div 
-                      key={entry.hostname} 
+                    <motion.div
+                      key={entry.hostname}
                       className="host-item glass-card"
                       variants={itemVariants}
                       whileHover={{ scale: 1.01 }}
@@ -356,7 +401,7 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                         <span className="host-ip">{mapping?.ip || entry.ip} mapping</span>
                       </div>
                       <div className="host-actions">
-                        <button 
+                        <button
                           className="action-btn remove-btn"
                           onClick={() => handleRemove(entry.hostname)}
                           disabled={loading}
@@ -364,10 +409,10 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
                         >
                           <Trash2 size={16} />
                         </button>
-                        <a 
-                          href={displayUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
+                        <a
+                          href={displayUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="action-btn link-btn"
                           title="Abrir en navegador"
                         >
@@ -383,7 +428,8 @@ const HostnameManager: React.FC<HostnameManagerProps> = ({ translations }) => {
         </motion.div>
       </motion.div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         .hostname-view {
           padding: 40px;
           height: 100%;
