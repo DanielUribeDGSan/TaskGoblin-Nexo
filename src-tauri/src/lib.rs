@@ -409,31 +409,35 @@ async fn sync_system_configuration(config: SystemConfig) -> Result<(), String> {
         Command::new("osascript").arg("-e").arg(script).status().map_err(|e| e.to_string())?;
 
     } else if cfg!(target_os = "windows") {
-        // En Windows, podríamos hacer algo similar con un script de PowerShell elevado
-        // Por simplicidad inmediata, seguimos usando portproxy individual o agrupado
-        let mut ps_commands = format!(
-            "Copy-Item -Path '{temp_h}' -Destination '{hosts}' -Force; \
-            ipconfig /flushdns",
+        let temp_script_path = std::env::temp_dir().join("nexo_sync_hosts.ps1");
+        
+        let mut ps_content = format!(
+            "Copy-Item -Path \"{temp_h}\" -Destination \"{hosts}\" -Force; ipconfig /flushdns",
             temp_h = temp_hosts.display(),
             hosts = hosts_path
         );
 
         for rule in &config.pf_rules {
-            ps_commands.push_str(&format!(
+            ps_content.push_str(&format!(
                 "; netsh interface portproxy add v4tov4 listenport=80 listenaddress={} connectport={} connectaddress=127.0.0.1",
                 rule.ip, rule.target_port
             ));
         }
 
+        fs::write(&temp_script_path, ps_content).map_err(|e| e.to_string())?;
+
         let powershell_cmd = format!(
-            "Start-Process powershell -ArgumentList '-Command \"{}\"' -Verb RunAs -Wait",
-            ps_commands
+            "Start-Process powershell -ArgumentList \"-NoProfile\", \"-ExecutionPolicy\", \"Bypass\", \"-File\", \"{script}\" -Verb RunAs -Wait",
+            script = temp_script_path.display()
         );
 
         Command::new("powershell")
-            .args(["-Command", &powershell_cmd])
+            .args(["-NoProfile", "-Command", &powershell_cmd])
             .status()
             .map_err(|e| e.to_string())?;
+            
+        // Optional: cleanup the temp script
+        let _ = fs::remove_file(temp_script_path);
     }
 
     Ok(())

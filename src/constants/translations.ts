@@ -96,7 +96,7 @@ export const translations = {
       resultingUrl: "Resulting Friendly URL",
       hidePort: "Hide port in the URL (Experimental)",
       searchPlaceholder: "Search mappings...",
-      viteTip: "For friendly URLs to work, your server (Vite) must run with <code>-- --host</code> (e.g., <code>npm run dev -- --host</code>)."
+      viteTip: "For friendly URLs to work, your server must run in host mode (<code>-- --host</code>). Also, if you use <strong>Vite 6+</strong>, you must allow the host in <code>vite.config.js</code>: <br/><br/> <code>server: { allowedHosts: true }</code>"
     },
     snippets: {
       title: "Command Snippets",
@@ -229,7 +229,7 @@ export const translations = {
       resultingUrl: "URL Amigable Resultante",
       hidePort: "Quitar puerto de la URL (Experimental)",
       searchPlaceholder: "Buscar mapeos...",
-      viteTip: "Para que las URLs amigables funcionen, tu servidor (Vite) debe correr con <code>-- --host</code> (ejemplo: <code>npm run dev -- --host</code>)."
+      viteTip: "Para que las URLs amigables funcionen, tu servidor debe correr en modo host (<code>-- --host</code>). Además, si usas <strong>Vite 6+</strong>, debes permitir el host en <code>vite.config.js</code>: <br/><br/> <code>server: { allowedHosts: true }</code>"
     },
     snippets: {
       title: "Snippets de Comandos",
