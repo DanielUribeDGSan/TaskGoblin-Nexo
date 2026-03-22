@@ -12,6 +12,8 @@ import NewEnvModal from "./components/NewEnvModal";
 import { invoke } from "@tauri-apps/api/core";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { translations, Language } from "./constants/translations";
+import LicenseScreen from "./components/LicenseScreen";
+import { AlertCircle } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { enable, disable, isEnabled as checkAutostart } from "@tauri-apps/plugin-autostart";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,8 +35,59 @@ const App: React.FC = () => {
   const [isAutostartEnabled, setIsAutostartEnabled] = useState(false);
   const [alert, setAlert] = useState<{ message: string; title: string } | null>(null);
 
+  const [isLicenseValid, setIsLicenseValid] = useState(() => {
+    return localStorage.getItem("app-license-valid") === "true";
+  });
+  const [installDate] = useState(() => {
+    let dateStr = localStorage.getItem("app-install-date");
+    if (!dateStr) {
+      dateStr = new Date().toISOString();
+      localStorage.setItem("app-install-date", dateStr);
+    }
+    return new Date(dateStr);
+  });
+
+  const trialDurationHours = 48;
+  const now = new Date();
+  const hoursSinceInstall = (now.getTime() - installDate.getTime()) / (1000 * 60 * 60);
+  const trialExpired = hoursSinceInstall >= trialDurationHours;
+  const trialHoursRemaining = Math.max(0, Math.ceil(trialDurationHours - hoursSinceInstall));
+  const isLocked = trialExpired && !isLicenseValid;
+
   const store = new LazyStore("nexo_settings.json");
   const t = translations[language];
+
+  useEffect(() => {
+    const performBackgroundCheck = async () => {
+      const email = localStorage.getItem("app-email");
+      const key = localStorage.getItem("app-license-key");
+      const lastCheck = localStorage.getItem("app-last-license-check");
+
+      if (email && key && isLicenseValid) {
+        let shouldCheck = true;
+        if (lastCheck) {
+          const hoursSinceReview = (new Date().getTime() - new Date(lastCheck).getTime()) / (1000 * 60 * 60);
+          if (hoursSinceReview < 24) shouldCheck = false;
+        }
+
+        if (shouldCheck) {
+          try {
+            const { checkLicenseStatus } = await import("./utils/license");
+            const result = await checkLicenseStatus(email, key);
+            if (result.status !== "valid" && result.status !== "error") {
+              setIsLicenseValid(false);
+              localStorage.setItem("app-license-valid", "false");
+            } else if (result.status === "valid") {
+              localStorage.setItem("app-last-license-check", new Date().toISOString());
+            }
+          } catch (e) {
+            console.error("Background license check failed", e);
+          }
+        }
+      }
+    };
+    performBackgroundCheck();
+  }, [isLicenseValid]);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -260,17 +313,102 @@ const App: React.FC = () => {
       />
       
       <main className="main-content">
-        {activeTab === "projects" && (
-          <ProjectGrid 
-            projects={projects} 
-            onLaunch={handleLaunch} 
-            onOpenSettings={handleOpenEditProjectModal}
-            onDelete={handleDeleteProject}
-            onAddProject={handleOpenAddModal}
-            translations={t.projects}
-          />
+        {activeTab === "hostnames" && (
+          <HostnameManager translations={t.hostnames} />
         )}
-        {activeTab === "snippets" && (
+        
+        {isLocked && activeTab !== "settings" && (
+          <div className="placeholder-view" style={{ textAlign: 'center' }}>
+            <AlertCircle size={48} style={{ color: '#ff4444', marginBottom: 16 }} />
+            <h2 style={{ fontSize: 24, marginBottom: 8 }}>{language === 'es' ? 'Prueba Finalizada' : 'Trial Expired'}</h2>
+            <p style={{ maxWidth: 400, opacity: 0.8, marginBottom: 24 }}>
+              {language === 'es' 
+                ? 'Tu periodo de prueba de 48 horas ha finalizado. Por favor, activa tu licencia para seguir usando Nexo.' 
+                : 'Your 48-hour trial has expired. Please activate your license to continue using Nexo.'}
+              <br />
+              <a 
+                href="https://task-goblin.com/nexo-app" 
+                target="_blank" 
+                rel="noreferrer"
+                style={{ 
+                  display: 'inline-block',
+                  marginTop: '12px',
+                  fontSize: '14px',
+                  color: '#a855f7',
+                  textDecoration: 'underline',
+                  fontWeight: 600
+                }}
+              >
+                {t.trial.buy_link}
+              </a>
+            </p>
+            <button 
+              className="glass-button glass-button-primary" 
+              onClick={() => setActiveTab("settings")}
+            >
+              {language === 'es' ? 'Ir a Configuración' : 'Go to Settings'}
+            </button>
+          </div>
+        )}
+
+        {!isLocked && activeTab === "projects" && (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {!isLicenseValid && (
+              <div style={{ 
+                margin: '20px 40px 0', 
+                padding: '12px 16px', 
+                borderRadius: '12px', 
+                background: trialExpired ? 'rgba(255, 68, 68, 0.1)' : 'rgba(168, 85, 247, 0.1)',
+                border: '1px solid',
+                borderColor: trialExpired ? 'rgba(255, 68, 68, 0.2)' : 'rgba(168, 85, 247, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}>
+                <AlertCircle size={18} style={{ color: trialExpired ? '#ff4444' : '#a855f7', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontSize: '13px', 
+                    color: trialExpired ? '#ff4444' : '#fff', 
+                    fontWeight: 500,
+                    lineHeight: '1.4'
+                  }}>
+                    {trialExpired 
+                      ? t.trial.expired 
+                      : t.trial.expires_in.replace('{hours}', trialHoursRemaining.toString())
+                    }
+                  </div>
+                  {trialExpired && (
+                    <a 
+                      href="https://task-goblin.com/nexo-app" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ 
+                        display: 'inline-block',
+                        marginTop: '4px',
+                        fontSize: '12px',
+                        color: '#fff',
+                        textDecoration: 'underline',
+                        fontWeight: 600
+                      }}
+                    >
+                      {t.trial.buy_link}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            <ProjectGrid 
+              projects={projects} 
+              onLaunch={handleLaunch} 
+              onOpenSettings={handleOpenEditProjectModal}
+              onDelete={handleDeleteProject}
+              onAddProject={handleOpenAddModal}
+              translations={t.projects}
+            />
+          </div>
+        )}
+        {!isLocked && activeTab === "snippets" && (
           <SnippetManager 
             snippets={snippets} 
             onEdit={handleOpenEditSnippetModal}
@@ -279,7 +417,7 @@ const App: React.FC = () => {
             translations={t.snippets}
           />
         )}
-        {activeTab === "env" && (
+        {!isLocked && activeTab === "env" && (
           <EnvManager 
             profiles={envProfiles}
             onEdit={handleOpenEditEnvModal}
@@ -288,18 +426,15 @@ const App: React.FC = () => {
             translations={t.envManager}
           />
         )}
-        {activeTab === "ports" && (
+        {!isLocked && activeTab === "ports" && (
           <PortManager 
             translations={t.portManager} 
             projects={projects}
             onLaunch={handleLaunch}
           />
         )}
-        {activeTab === "share" && (
+        {!isLocked && activeTab === "share" && (
           <ShareProject translations={t.share} />
-        )}
-        {activeTab === "hostnames" && (
-          <HostnameManager translations={t.hostnames} />
         )}
         {activeTab === "settings" && (
           <div className="settings-view">
@@ -336,6 +471,10 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <p className="setting-desc">{t.settings.autostartDesc}</p>
+              </section>
+              
+              <section className="settings-section glass-card" style={{ gridColumn: '1 / -1' }}>
+                <LicenseScreen onValidated={() => setIsLicenseValid(true)} t={t.license} />
               </section>
             </div>
           </div>

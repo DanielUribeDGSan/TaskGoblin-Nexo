@@ -130,6 +130,28 @@ export const translations = {
       saveProfile: "Save Profile",
       updateProfile: "Update Profile",
       searchPlaceholder: "Search profiles..."
+    },
+    license: {
+      form_title: "Activate License",
+      form_desc: "Enter your email and license key to unlock the full version.",
+      label_email: "Email Address",
+      placeholder_email: "you@example.com",
+      label_key: "License Key",
+      placeholder_key: "LS-XXXX-XXXX",
+      btn_activate: "Activate",
+      btn_validating: "Validating...",
+      buy_link: "Don't have a license? Get one here.",
+      error_invalid: "License not found or invalid email.",
+      in_use_msg: "This license is bound to another device. Transfer it to this computer?",
+      btn_transfer: "Transfer License",
+      btn_transferring: "Transferring...",
+      show_key: "Show Key",
+      hide_key: "Hide Key",
+    },
+    trial: {
+      expired: "Your trial period has ended. Get a license to continue using Nexo.",
+      expires_in: "Trial period: {hours} hours remaining.",
+      buy_link: "Get License"
     }
   },
   es: {
@@ -263,6 +285,28 @@ export const translations = {
       saveProfile: "Guardar Perfil",
       updateProfile: "Actualizar Perfil",
       searchPlaceholder: "Buscar perfiles..."
+    },
+    license: {
+      form_title: "Activar Licencia",
+      form_desc: "Ingresa tu correo y clave de licencia para activar tu app.",
+      label_email: "Correo Electrónico",
+      placeholder_email: "tu@ejemplo.com",
+      label_key: "Clave de Licencia",
+      placeholder_key: "LS-XXXX-XXXX",
+      btn_activate: "Activar",
+      btn_validating: "Validando...",
+      buy_link: "¿No tienes una licencia? Consíguela aquí.",
+      error_invalid: "Licencia no encontrada o correo inválido.",
+      in_use_msg: "Esta licencia está vinculada a otro dispositivo. ¿Transferirla aquí?",
+      btn_transfer: "Transferir Licencia",
+      btn_transferring: "Transfiriendo...",
+      show_key: "Mostrar Clave",
+      hide_key: "Ocultar Clave",
+    },
+    trial: {
+      expired: "Tu periodo de prueba ha terminado. Consigue una licencia para seguir usando Nexo.",
+      expires_in: "Periodo de prueba: quedan {hours} horas.",
+      buy_link: "Obtener Licencia"
     }
   }
 };
